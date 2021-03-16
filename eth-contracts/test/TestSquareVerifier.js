@@ -5,3 +5,69 @@
 
     
 // Test verification with incorrect proof
+
+const expect = require('chai').expect;
+const truffleAssert = require('truffle-assertions');
+
+const contractDefinition = artifacts.require('Verifier');
+const proofFromFile = require("../../zokrates/code/square/proof.json");
+let proofAsUint;
+contract('Verifier', accounts => {
+    before(async() => { 
+        contractInstance = await contractDefinition.deployed();
+        proofAsUint = getProofAsUint();
+    });
+
+    it('should verify true with the correct proof and emit event', async() => {
+        let tx = await contractInstance.verifyTx(
+            proofAsUint.proof.a,
+            proofAsUint.proof.b,
+            proofAsUint.proof.c,
+            proofAsUint.input
+        );
+
+        truffleAssert.eventEmitted(tx, 'Verified', (ev) => {
+            return expect(ev.s).to.deep.equal("Transaction successfully verified.");
+        });
+    });
+
+    it('should verify false with the incorrect proof and not emit event', async() => {
+        let tx = await contractInstance.verifyTx(
+            proofAsUint.proof.a,
+            proofAsUint.proof.b,
+            proofAsUint.proof.a,
+            proofAsUint.input
+        );
+
+        truffleAssert.eventNotEmitted(tx, 'Verified');
+    });
+
+    it('should verify false with the incorrect proof for the input and not emit event', async() => {
+        let tx = await contractInstance.verifyTx(
+            proofAsUint.proof.a,
+            proofAsUint.proof.b,
+            proofAsUint.proof.c,
+            [16,1] //proof{A,B,C..} from inside proof.json is bound for input [9,1] and not [16,1]
+        );
+
+        truffleAssert.eventNotEmitted(tx, 'Verified');
+    });
+    
+});
+
+const getProofAsUint = () => {
+    return {
+        "proof": {
+            "a": [web3.utils.toBN(proofFromFile.proof.a[0]).toString(), web3.utils.toBN(proofFromFile.proof.a[1]).toString()],
+         
+            "b": [[web3.utils.toBN(proofFromFile.proof.b[0][0]).toString(), web3.utils.toBN(proofFromFile.proof.b[0][1]).toString()],
+                [web3.utils.toBN(proofFromFile.proof.b[1][0]).toString(), web3.utils.toBN(proofFromFile.proof.b[1][1]).toString()]
+            ],
+      
+            "c": [web3.utils.toBN(proofFromFile.proof.c[0]).toString(), web3.utils.toBN(proofFromFile.proof.c[1]).toString()]
+        },
+        "input": [web3.utils.toBN(proofFromFile.inputs[0]).toString(),web3.utils.toBN(proofFromFile.inputs[1]).toString()]
+    };
+};
+
+
